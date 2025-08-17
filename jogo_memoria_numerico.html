@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo da Memória Numérica</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f0f4f8; }
+    .card-flip-container { perspective: 1000px; }
+    .card-inner { transition: transform 0.6s; transform-style: preserve-3d; position: relative; }
+    .card-flip { transform: rotateY(180deg); }
+    .card-front, .card-back {
+      backface-visibility: hidden; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    }
+    .card-back { transform: rotateY(180deg); }
+  </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+  <div class="bg-white p-6 md:p-10 rounded-xl shadow-2xl max-w-lg w-full text-center">
+    <h1 class="text-3xl font-bold text-gray-800 mb-4">Jogo da Memória Numérica</h1>
+    <p id="game-message" class="text-gray-600 text-lg mb-6" aria-live="polite">Clique em "Iniciar Jogo" para começar!</p>
+
+    <div id="game-board" class="grid gap-4 mb-6"></div>
+
+    <button id="start-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-300">
+      Iniciar Jogo
+    </button>
+  </div>
+
+  <script>
+    const gameBoard = document.getElementById('game-board');
+    const startButton = document.getElementById('start-button');
+    const gameMessage = document.getElementById('game-message');
+
+    let numbers = [];
+    let shuffledNumbers = [];
+    let currentGuess = 1;
+    let isGameActive = false;
+    let isRevealing = false;
+
+    const gridSize = 3; // 🔥 altere aqui para 4 para criar 4x4
+
+    function shuffle(array) {
+      let currentIndex = array.length, randomIndex;
+      while (currentIndex != 0) {
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+      }
+      return array;
+    }
+
+    function createBoard() {
+      gameBoard.innerHTML = '';
+      gameBoard.style.gridTemplateColumns = `repeat(${gridSize}, minmax(80px, 1fr))`;
+      shuffledNumbers = shuffle([...numbers]);
+
+      shuffledNumbers.forEach((number, index) => {
+        const cardContainer = document.createElement('div');
+        cardContainer.classList.add('card-flip-container');
+
+        const cardInner = document.createElement('div');
+        cardInner.classList.add('card-inner', 'w-20', 'h-20', 'sm:w-24', 'sm:h-24');
+        cardInner.tabIndex = 0; // acessibilidade
+        cardInner.dataset.number = number;
+        cardInner.dataset.index = index;
+
+        const cardFront = document.createElement('div');
+        cardFront.classList.add('card-front', 'flex', 'items-center', 'justify-center', 'text-3xl', 'font-bold', 'bg-blue-200', 'text-blue-800', 'rounded-lg', 'shadow-md', 'border-4', 'border-blue-400');
+        cardFront.textContent = number;
+
+        const cardBack = document.createElement('div');
+        cardBack.classList.add('card-back', 'flex', 'items-center', 'justify-center', 'bg-gray-300', 'text-gray-700', 'rounded-lg', 'shadow-md', 'border-4', 'border-gray-500', 'cursor-pointer');
+        cardBack.innerHTML = `?`;
+
+        cardInner.appendChild(cardFront);
+        cardInner.appendChild(cardBack);
+        cardContainer.appendChild(cardInner);
+        gameBoard.appendChild(cardContainer);
+      });
+    }
+
+    function flipCards(faceUp = true) {
+      document.querySelectorAll('.card-inner').forEach(card => {
+        card.classList.toggle('card-flip', !faceUp);
+      });
+    }
+
+    function revealAllAndRestart() {
+      flipCards(true);
+      setTimeout(() => startGame(), 1500);
+    }
+
+    function checkGuess(event) {
+      if (!isGameActive || isRevealing) return;
+      const clickedCardInner = event.target.closest('.card-inner');
+      if (!clickedCardInner) return;
+      const guessedNumber = parseInt(clickedCardInner.dataset.number);
+      if (!clickedCardInner.classList.contains('card-flip')) return;
+
+      if (guessedNumber === currentGuess) {
+        clickedCardInner.classList.remove('card-flip');
+        gameMessage.textContent = `Você acertou! Próximo número é ${currentGuess + 1}.`;
+        currentGuess++;
+
+        if (currentGuess > numbers.length) {
+          isGameActive = false;
+          setTimeout(() => {
+            alert("🎉 Parabéns, você venceu!");
+          }, 500);
+        }
+      } else {
+        isGameActive = false;
+        clickedCardInner.classList.remove('card-flip');
+        gameMessage.textContent = `Ops! Você errou. O próximo número era ${currentGuess}.`;
+        setTimeout(() => revealAllAndRestart(), 800);
+      }
+    }
+
+    async function startGame() {
+      isGameActive = false;
+      isRevealing = true;
+      startButton.disabled = true;
+      currentGuess = 1;
+
+      numbers = Array.from({ length: gridSize * gridSize }, (_, i) => i + 1);
+      createBoard();
+
+      let timeLeft = 10;
+      gameMessage.textContent = `Memorize a ordem (${timeLeft}s restantes)...`;
+      flipCards(true);
+
+      const countdown = setInterval(() => {
+        timeLeft--;
+        gameMessage.textContent = `Memorize a ordem (${timeLeft}s restantes)...`;
+        if (timeLeft <= 0) {
+          clearInterval(countdown);
+          isRevealing = false;
+          gameMessage.textContent = 'Agora clique nas cartas em ordem crescente!';
+          flipCards(false);
+          isGameActive = true;
+          startButton.disabled = false;
+        }
+      }, 1000);
+    }
+
+    startButton.addEventListener('click', startGame);
+    gameBoard.addEventListener('click', checkGuess);
+    gameBoard.addEventListener('keydown', e => { if (e.key === 'Enter') checkGuess(e); });
+  </script>
+</body>
+</html>
